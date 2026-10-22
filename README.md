@@ -1,6 +1,6 @@
 # sgzz
 
-钟桢与宋歌的私密动态相册，以及可部署到 Cloudflare Workers 的 GitHub 白名单访问版。
+zz与sg的私密动态相册，以及可部署到 Cloudflare Workers 的 GitHub 白名单访问版。
 
 ## 功能
 
