@@ -1,0 +1,17 @@
+{
+  "name": "moments-private-album",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "check": "node --check src/worker.mjs && node --check src/pages.mjs && node --check src/auth-client.js && npm test && npm run build",
+    "dev": "npm run build && wrangler dev --ip localhost",
+    "db:local": "wrangler d1 migrations apply DB --local",
+    "db:remote": "wrangler d1 migrations apply DB --remote",
+    "deploy": "npm run check && wrangler deploy"
+  },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}

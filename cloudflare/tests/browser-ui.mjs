@@ -1,0 +1,36 @@
+import { createRequire } from 'node:module';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import assert from 'node:assert/strict';
+const require = createRequire(import.meta.url);
+const { chromium, devices } = require(process.env.PLAYWRIGHT_MODULE_PATH || 'playwright');
+const tokens = JSON.parse(await readFile(new URL('../.wrangler/local-ui-session.json', import.meta.url), 'utf8'));
+const browser = await chromium.launch({ ...(process.env.BROWSER_EXECUTABLE_PATH ? { executablePath: process.env.BROWSER_EXECUTABLE_PATH } : {}), headless: true });
+const root = 'http://localhost:8787';
+const cookie = value => ({ name: '__Host-moments_session', value, domain: 'localhost', path: '/', httpOnly: true, secure: true, sameSite: 'Lax' });
+try {
+  const anon = await browser.newContext(), login = await anon.newPage();
+  await login.goto(root); await login.waitForURL('**/login**');
+  assert.equal(await login.locator('.card').count(), 0); assert.equal(await login.locator('#birthday-zhong').count(), 0);
+  await login.screenshot({ path: fileURLToPath(new URL('../.wrangler/login-preview.png', import.meta.url)), fullPage: true });
+  const owner = await browser.newContext({ viewport: { width: 1366, height: 900 } }), member = await browser.newContext({ ...devices['iPhone 13'] });
+  await owner.addCookies([cookie(tokens.owner)]); await member.addCookies([cookie(tokens.member)]);
+  const p = await owner.newPage(), errors = []; p.on('pageerror', error => errors.push(error.message));
+  const albumResponse = await p.goto(root); assert.equal(albumResponse.status(), 200);
+  await p.locator('#cloud-admin-link').waitFor({ state: 'visible' }); assert.equal(await p.locator('#cloud-account-label').textContent(), '@Sg-427');
+  assert.equal(await p.locator('#birthday-zhong').count(), 1); await p.locator('#cloud-admin-link').click();
+  await p.waitForURL('**/admin'); await p.locator('#users tr').filter({ hasText: '@local-ui-member' }).waitFor();
+  assert.ok((await p.locator('body').textContent()).includes('水果榨汁')); assert.ok((await p.locator('#users tr').filter({ hasText: '@Sg-427' }).textContent()).includes('受保护'));
+  await p.screenshot({ path: fileURLToPath(new URL('../.wrangler/admin-preview.png', import.meta.url)), fullPage: true });
+  const m = await member.newPage(); await m.goto(root); await m.waitForFunction(() => document.getElementById('cloud-account-label').textContent === '@local-ui-member');
+  assert.equal(await m.locator('#cloud-admin-link').isVisible(), false);
+  const forbidden = await member.request.get(root + '/api/admin/users'); assert.equal(forbidden.status(), 403);
+  await p.locator('#users tr').filter({ hasText: '@local-ui-member' }).getByRole('button', { name: '撤销访问' }).click();
+  await p.waitForFunction(() => document.getElementById('status').textContent === '已更新');
+  await m.reload(); await m.waitForURL('**/login**'); assert.equal(await m.locator('.card').count(), 0);
+  await p.locator('#logout').click(); await p.waitForURL('**/login');
+  const blocked = await owner.request.get(root + '/index.html', { maxRedirects: 0 }); assert.equal(blocked.status(), 303);
+  assert.deepEqual(errors, []);
+  console.log(JSON.stringify({ actualWorkerRuntime: 'pass', actualD1: 'pass', anonymousAssetProtection: 'pass', adminUI: 'pass', protectedOwner: 'pass', memberCannotAdmin: 'pass', browserSessionRevocation: 'pass', logout: 'pass', mobileMemberView: 'pass' }));
+  await owner.close(); await member.close(); await anon.close();
+} finally { await browser.close(); }

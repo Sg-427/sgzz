@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "moments-private-album",
+  "main": "src/worker.mjs",
+  "compatibility_date": "2026-10-22",
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "not_found_handling": "none"
+  },
+  "vars": {
+    "SITE_URL": "https://replace-with-your-worker-domain.workers.dev",
+    "OWNER_GITHUB_ID": "205340307",
+    "OWNER_GITHUB_LOGIN": "Sg-427",
+    "OWNER_DISPLAY_NAME": "水果榨汁"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "moments-access",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "migrations"
+    }
+  ]
+}

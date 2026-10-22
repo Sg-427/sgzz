@@ -1,0 +1,7 @@
+# Copy to .dev.vars for local development. Never commit .dev.vars.
+SITE_URL="http://localhost:8787"
+OWNER_GITHUB_ID="205340307"
+OWNER_GITHUB_LOGIN="Sg-427"
+OWNER_DISPLAY_NAME="水果榨汁"
+GITHUB_CLIENT_ID="replace-with-local-oauth-client-id"
+GITHUB_CLIENT_SECRET="replace-with-local-oauth-client-secret"

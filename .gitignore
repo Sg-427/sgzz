@@ -1,0 +1,19 @@
+# Local dependencies, build output, and Cloudflare runtime state
+**/node_modules/
+**/.wrangler/
+**/.npm-cache/
+**/dist/
+**/coverage/
+
+# Secrets and machine-specific configuration
+**/.dev.vars
+**/.dev.vars.*
+!**/.dev.vars.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Local logs and editor/OS artifacts
+*.log
+.DS_Store
+Thumbs.db
