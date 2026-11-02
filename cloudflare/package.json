@@ -11,7 +11,8 @@
     "dev": "npm run build && wrangler dev --ip localhost",
     "db:local": "wrangler d1 migrations apply DB --local",
     "db:remote": "wrangler d1 migrations apply DB --remote",
-    "deploy": "npm run check && wrangler deploy"
+    "deploy": "npm run check && wrangler deploy",
+    "deploy:ci": "wrangler d1 migrations apply DB --remote && wrangler deploy"
   },
   "devDependencies": { "wrangler": "^4.0.0" }
 }

@@ -29,7 +29,7 @@ cloudflare/
 
 请按 [Cloudflare 部署说明](cloudflare/README.md) 配置网址、D1 和 GitHub OAuth App。
 
-如果在 Cloudflare Workers Builds 中连接此仓库，根目录选择 `cloudflare`。构建命令为 `npm ci && npm run build`，部署命令为 `npx wrangler deploy`。数据库迁移和 GitHub 密钥须按部署说明事先配置。
+如果在 Cloudflare Workers Builds 中连接此仓库，Worker 名称为 `sgzz`，根目录选择 `cloudflare`。构建命令为 `npm ci && npm run build`，部署命令为 `npm run deploy:ci`（先初始化或更新 D1 表，再部署）。GitHub 密钥须按部署说明配置在 Worker 的运行时秘密变量中。
 
 初始管理员是 GitHub 账号 **Sg-427**，管理页面显示名为 **水果榨汁**。上线后可在 `/admin` 管理其他账号的访问权限。
 

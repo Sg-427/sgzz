@@ -12,7 +12,7 @@
     "not_found_handling": "none"
   },
   "vars": {
-    "SITE_URL": "https://replace-with-your-worker-domain.workers.dev",
+    "SITE_URL": "https://sgzz.3205819496.workers.dev",
     "OWNER_GITHUB_ID": "205340307",
     "OWNER_GITHUB_LOGIN": "Sg-427",
     "OWNER_DISPLAY_NAME": "水果榨汁"
@@ -21,7 +21,7 @@
     {
       "binding": "DB",
       "database_name": "moments-access",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "eae9c0ca-c027-4433-aa4e-eb5d44f8157c",
       "migrations_dir": "migrations"
     }
   ]

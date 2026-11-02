@@ -41,17 +41,17 @@ npx wrangler login
 npx wrangler d1 create moments-access
 ```
 
-把命令返回的 `database_id` 填入 `wrangler.jsonc`，替换全零占位值。保留绑定名 `DB`。
+当前 `wrangler.jsonc` 已填写提供的数据库 ID：`eae9c0ca-c027-4433-aa4e-eb5d44f8157c`。请确认它位于部署 `sgzz` 的同一个 Cloudflare 账号中。已有数据库时无需重复创建；如果更换数据库，更新 `database_id`，保留绑定名 `DB`。
 
 ### 3. 确定唯一的网址
 
-把 `wrangler.jsonc` 中的 `SITE_URL` 改为最终网址，例如：
+当前 `wrangler.jsonc` 中的 `SITE_URL` 已设为：
 
 ```json
-"SITE_URL": "https://moments-private-album.你的子域.workers.dev"
+"SITE_URL": "https://sgzz.3205819496.workers.dev"
 ```
 
-也可以使用自定义域名。网址只填来源地址，不带子路径；代码会拒绝其他来源地址，防止出现未经配置的入口。
+在 Cloudflare 的 `sgzz → 设置 → 域和路由` 中查看实际地址，也可以使用自定义域名。这里需要网站的访问地址，不能填写 GitHub 仓库地址。网址只填来源地址，不带子路径；代码会拒绝其他来源地址，防止出现未经配置的入口。配置中的 Worker 名称 `sgzz` 应与 Cloudflare 后台一致。
 
 如果后来更换域名，需要同时更新 `SITE_URL` 和 GitHub OAuth 回调地址，再部署。
 
@@ -61,7 +61,7 @@ npx wrangler d1 create moments-access
 
 - Application name：例如「瞬间 · 私密相册」。
 - Homepage URL：填写上述 `SITE_URL`。
-- Authorization callback URL：填写 `SITE_URL/auth/callback`，例如 `https://你的网址/auth/callback`。
+- Authorization callback URL：填写 `https://sgzz.3205819496.workers.dev/auth/callback`。
 
 记录 Client ID，并生成 Client Secret。Client Secret 只放在 Cloudflare 的秘密变量中，不要提交到仓库或写进 HTML。
 
@@ -93,7 +93,16 @@ npx wrangler secret put GITHUB_CLIENT_SECRET
 npm run deploy
 ```
 
-如果使用 GitHub 仓库接入 Cloudflare Workers Builds，请把整个 `moments-album` 放入仓库，根目录选择 `cloudflare`；构建命令为 `npm ci && npm run build`，部署命令为 `npx wrangler deploy`。D1 迁移和 GitHub 秘密变量仍须事先配置。请使用 Workers 项目，避免把 `dist/` 另行发布为公开 Pages 静态站点。
+如果使用 GitHub 仓库接入 Cloudflare Workers Builds，请保留完整仓库结构，设置如下：
+
+| 构建设置 | 值 |
+| --- | --- |
+| Worker 名称 | `sgzz` |
+| 根目录 | `cloudflare` |
+| 构建命令 | `npm ci && npm run build` |
+| 部署命令 | `npm run deploy:ci` |
+
+`deploy:ci` 会先向配置的远程 D1 数据库应用尚未执行的迁移，再上传 Worker；已经执行的迁移不会重复创建表。构建使用的 Cloudflare API Token 需要目标账号的 D1 编辑权限。GitHub 登录的秘密变量仍须在 Worker 的运行时设置中配置：`GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET`。请使用 Workers 项目，避免把 `dist/` 另行发布为公开 Pages 静态站点。
 
 ## 本地开发与校验
 
