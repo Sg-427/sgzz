@@ -139,3 +139,8 @@ npm run dev
 - [GitHub 用户 ID 与账号身份](https://docs.github.com/en/rest/users/users#get-a-user-using-their-id)
 - [Cloudflare Worker 先行处理静态资源](https://developers.cloudflare.com/workers/static-assets/routing/worker-script/)
 - [Cloudflare D1 迁移](https://developers.cloudflare.com/d1/reference/migrations/)
+
+## Workers 运行时兼容性
+
+GitHub 登录请求使用 manual 重定向模式，并拒绝非 2xx 响应。Cloudflare Workers 不支持 error 模式；使用该模式会在发出请求前抛出异常，导致登录回调失败。
+
