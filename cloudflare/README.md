@@ -104,6 +104,12 @@ npm run deploy
 
 `deploy:ci` 会先向配置的远程 D1 数据库应用尚未执行的迁移，再上传 Worker；已经执行的迁移不会重复创建表。构建使用的 Cloudflare API Token 需要目标账号的 D1 编辑权限。GitHub 登录的秘密变量仍须在 Worker 的运行时设置中配置：`GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET`。请使用 Workers 项目，避免把 `dist/` 另行发布为公开 Pages 静态站点。
 
+### 构建提示 `Missing script: "deploy:ci"`
+
+`deploy:ci` 从提交 `45a5d05` 起已存在于 `cloudflare/package.json`。如果仍提示找不到，请核对连接的仓库是否为 `Sg-427/sgzz`、生产分支是否为 `main`、根目录是否为 `cloudflare`，并从部署列表选择最新提交的构建。旧构建的重试不能证明已拉取最新代码。
+
+当前构建会在日志中输出 `Source revision` 和 `CI deployment script`。用它们核对实际构建的提交和部署脚本；源码压缩包或没有 Git 命令的环境会将提交显示为不可用，但仍可正常构建。
+
 ## 本地开发与校验
 
 ```sh
