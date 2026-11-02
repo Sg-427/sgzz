@@ -143,7 +143,9 @@ async function prune(env) {
 export function createWorker({ fetchImpl = (...args) => fetch(...args) } = {}) {
   async function githubFetch(url, options = {}) {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 12000);
-    try { return await fetchImpl(url, { ...options, redirect: 'error', signal: controller.signal }); }
+    // Workers rejects redirect:'error' before sending the request. Manual mode keeps
+    // credentials on the intended endpoint; callers reject every non-2xx response.
+    try { return await fetchImpl(url, { ...options, redirect: 'manual', signal: controller.signal }); }
     finally { clearTimeout(timer); }
   }
 

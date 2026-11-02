@@ -116,6 +116,7 @@ test('OAuth uses state, browser binding, PKCE, canonical redirect, and one-time 
   const auth = await f.finish(start, 'owner'); assert.equal(auth.response.status, 303); assert.equal(auth.response.headers.get('Location'), '/');
   const exchange = new URLSearchParams(f.calls[0].options.body);
   assert.equal(f.calls[0].options.headers['User-Agent'], 'Moments-Private-Album');
+  assert.ok(f.calls.every(call => call.options.redirect === 'manual'));
   assert.equal(createHash('sha256').update(exchange.get('code_verifier')).digest('base64url'), start.destination.searchParams.get('code_challenge'));
   assert.equal(exchange.get('redirect_uri'), ORIGIN + '/auth/callback');
   const repeat = await f.finish(start, 'owner'); assert.equal(repeat.response.headers.get('Location'), '/login?reason=state');
@@ -149,6 +150,20 @@ test('OAuth failures use fixed categories without exposing provider credentials 
   f.sqlite.exec('DROP TABLE sessions');
   const auth = await f.finish(start, 'owner');
   assert.equal(auth.response.headers.get('Location'), '/login?reason=provider_session'); assert.equal(auth.sessionCookie, undefined);
+});
+
+test('GitHub redirects are rejected without forwarding credentials to a different endpoint', async t => {
+  for (const host of ['github.com', 'api.github.com']) {
+    const f = fixture(t, async (url, options) => {
+      assert.equal(options.redirect, 'manual');
+      if (url.hostname === host) return new Response(null, { status: 302, headers: { Location: 'https://unexpected.example/' } });
+    });
+    const auth = await f.login();
+    assert.equal(auth.response.headers.get('Location'), '/login?reason=' + (host === 'github.com' ? 'provider_token' : 'provider_profile'));
+    assert.equal(auth.sessionCookie, undefined);
+    assert.ok(f.calls.every(call => ['github.com', 'api.github.com'].includes(new URL(call.url).hostname)));
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM sessions').get().n, 0);
+  }
 });
 
 test('configured owner can manage accounts, while the owner cannot be removed or downgraded', async t => {
