@@ -7,7 +7,7 @@ function shell(title, body, nonce, script = '') {
 }
 
 export function loginPage({ reason = '', returnTo = '/', configured = true }, nonce) {
-  const notices = { expired: '登录已过期或访问权限已变更，请重新登录。', state: '这次登录已失效，请重新点击 GitHub 登录。', provider: 'GitHub 登录暂未完成，请稍后重试。', denied: '当前账号尚未获得访问许可，请联系管理员。' };
+  const notices = { expired: '登录已过期或访问权限已变更，请重新登录。', state: '这次登录已失效，请重新点击 GitHub 登录。', provider: 'GitHub 登录暂未完成，请稍后重试。', provider_token: '暂时无法完成 GitHub 登录验证，请稍后重试。', provider_credentials: '站点的 GitHub 登录凭据不匹配，请联系管理员核对配置。', provider_redirect: '站点的 GitHub 登录回调地址不匹配，请联系管理员核对配置。', provider_email: '请先在 GitHub 验证账号的主要邮箱，再重新登录。', provider_profile: '暂时无法读取 GitHub 身份，请稍后重试。', provider_session: '暂时无法保存登录会话，请稍后重试。', denied: '当前账号尚未获得访问许可，请联系管理员。' };
   return shell('登录', `<main class="login"><section class="login-card"><span class="eyebrow">MOMENTS · PRIVATE SPACE</span><div class="mark" aria-hidden="true">◎</div><h1>一些瞬间，<br>只与获邀的人分享。</h1><p>请使用获准的 GitHub 账号登录。</p>${configured ? `${notices[reason] ? `<p class="notice" role="status">${notices[reason]}</p>` : ''}<a class="button primary wide" href="/auth/github?returnTo=${encodeURIComponent(returnTo)}">使用 GitHub 登录</a><p class="small">登录后仍需通过账号白名单验证。</p>` : '<p class="notice" role="status">站点尚未完成登录配置，请联系管理员完成部署设置。</p>'}</section></main>`, nonce);
 }
 

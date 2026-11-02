@@ -36,7 +36,7 @@ function d1(sqlite) {
   };
 }
 
-function fixture(t) {
+function fixture(t, networkOverride) {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../migrations/0001_access_control.sql', import.meta.url), 'utf8'));
   t.after(() => sqlite.close());
@@ -50,6 +50,7 @@ function fixture(t) {
   };
   const worker = createWorker({ fetchImpl: async (input, options = {}) => {
     const url = new URL(input); calls.push({ url: url.href, options });
+    if (networkOverride) { const response = await networkOverride(url, options); if (response) return response; }
     if (url.href === 'https://github.com/login/oauth/access_token') {
       const body = new URLSearchParams(options.body), code = body.get('code');
       if (!profiles[code]) return Response.json({ error: 'bad_verification_code' });
@@ -114,6 +115,7 @@ test('OAuth uses state, browser binding, PKCE, canonical redirect, and one-time 
   assert.equal(wrongBrowser.headers.get('Location'), '/login?reason=state'); assert.equal(f.calls.length, 0);
   const auth = await f.finish(start, 'owner'); assert.equal(auth.response.status, 303); assert.equal(auth.response.headers.get('Location'), '/');
   const exchange = new URLSearchParams(f.calls[0].options.body);
+  assert.equal(f.calls[0].options.headers['User-Agent'], 'Moments-Private-Album');
   assert.equal(createHash('sha256').update(exchange.get('code_verifier')).digest('base64url'), start.destination.searchParams.get('code_challenge'));
   assert.equal(exchange.get('redirect_uri'), ORIGIN + '/auth/callback');
   const repeat = await f.finish(start, 'owner'); assert.equal(repeat.response.headers.get('Location'), '/login?reason=state');
@@ -125,6 +127,28 @@ test('unlisted GitHub identities receive no session and no album bytes', async t
   const f = fixture(t), stranger = await f.login('stranger');
   assert.equal(stranger.response.status, 403); assert.equal(stranger.sessionCookie, undefined);
   assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM sessions').get().n, 0); assert.equal(f.assetCalls.length, 0);
+});
+
+test('OAuth failures use fixed categories without exposing provider credentials or descriptions', async t => {
+  const errors = { incorrect_client_credentials: 'provider_credentials', redirect_uri_mismatch: 'provider_redirect', bad_verification_code: 'state', unverified_user_email: 'provider_email', unexpected_error: 'provider_token', constructor: 'provider_token' };
+  for (const [error, reason] of Object.entries(errors)) {
+    const f = fixture(t, async url => url.hostname === 'github.com' ? Response.json({ error, error_description: 'sensitive provider response test-client-secret' }) : undefined);
+    const auth = await f.login();
+    assert.equal(auth.response.headers.get('Location'), '/login?reason=' + reason);
+    assert.equal(auth.sessionCookie, undefined);
+    assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM sessions').get().n, 0);
+    const page = await (await f.send('/login?reason=' + reason)).text();
+    assert.ok(!page.includes('test-client-secret')); assert.ok(!page.includes('sensitive provider response'));
+  }
+  for (const [host, reason] of [['github.com', 'provider_token'], ['api.github.com', 'provider_profile']]) {
+    const f = fixture(t, async url => { if (url.hostname === host) throw new Error('network failure with sensitive details'); });
+    const auth = await f.login();
+    assert.equal(auth.response.headers.get('Location'), '/login?reason=' + reason); assert.equal(auth.sessionCookie, undefined);
+  }
+  const f = fixture(t), start = await f.begin();
+  f.sqlite.exec('DROP TABLE sessions');
+  const auth = await f.finish(start, 'owner');
+  assert.equal(auth.response.headers.get('Location'), '/login?reason=provider_session'); assert.equal(auth.sessionCookie, undefined);
 });
 
 test('configured owner can manage accounts, while the owner cannot be removed or downgraded', async t => {

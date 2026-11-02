@@ -174,12 +174,21 @@ export function createWorker({ fetchImpl = (...args) => fetch(...args) } = {}) {
     if (!config.oauthReady || !browser || !state || !/^[A-Za-z0-9_-]{43}$/.test(state)) return failed('state');
     const flow = await env.DB.prepare('DELETE FROM oauth_states WHERE state_hash = ? AND browser_hash = ? AND expires_at > ? RETURNING code_verifier, return_to').bind(await sha256(state), await sha256(browser), nowSeconds()).first();
     if (!flow || url.searchParams.has('error') || !code || code.length > 512) return failed('state');
+    let failureReason = 'provider_token';
     try {
-      const response = await githubFetch('https://github.com/login/oauth/access_token', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, code, redirect_uri: config.callback, code_verifier: flow.code_verifier }).toString() });
-      if (!response.ok) return failed('provider');
+      const response = await githubFetch('https://github.com/login/oauth/access_token', { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded', 'User-Agent': 'Moments-Private-Album' }, body: new URLSearchParams({ client_id: env.GITHUB_CLIENT_ID, client_secret: env.GITHUB_CLIENT_SECRET, code, redirect_uri: config.callback, code_verifier: flow.code_verifier }).toString() });
+      if (!response.ok) return failed('provider_token');
       const tokens = await response.json();
-      if (tokens.error || typeof tokens.access_token !== 'string' || !tokens.access_token || String(tokens.token_type).toLowerCase() !== 'bearer') return failed('provider');
-      const profile = await githubUser('/user', tokens.access_token), allowed = await getUser(env, config, profile.githubId);
+      // Expose only fixed error categories, never provider descriptions or credential values.
+      if (tokens.error) {
+        const reasons = { incorrect_client_credentials: 'provider_credentials', redirect_uri_mismatch: 'provider_redirect', bad_verification_code: 'state', unverified_user_email: 'provider_email' };
+        return failed(Object.hasOwn(reasons, tokens.error) ? reasons[tokens.error] : 'provider_token');
+      }
+      if (typeof tokens.access_token !== 'string' || !tokens.access_token || String(tokens.token_type).toLowerCase() !== 'bearer') return failed('provider_token');
+      failureReason = 'provider_profile';
+      const profile = await githubUser('/user', tokens.access_token);
+      failureReason = 'provider_session';
+      const allowed = await getUser(env, config, profile.githubId);
       if (!allowed) {
         const denied = html(deniedPage(profile.login, nonce), nonce, 403);
         denied.headers.append('Set-Cookie', clearCookie(FLOW_COOKIE)); denied.headers.append('Set-Cookie', clearCookie(SESSION_COOKIE));
@@ -192,7 +201,7 @@ export function createWorker({ fetchImpl = (...args) => fetch(...args) } = {}) {
       ]);
       // The GitHub access token is intentionally never stored in D1 or returned to the browser.
       return redirect(safeReturn(flow.return_to), [clearCookie(FLOW_COOKIE), setCookie(SESSION_COOKIE, raw, SESSION_SECONDS)]);
-    } catch { return failed('provider'); }
+    } catch { return failed(failureReason); }
   }
 
   async function adminAPI(request, env, config, auth, url) {
