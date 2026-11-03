@@ -2,7 +2,8 @@ import { loginPage, deniedPage, adminPage, messagePage } from './pages.mjs';
 
 const SESSION_COOKIE = '__Host-moments_session';
 const FLOW_COOKIE = '__Host-moments_oauth';
-const SESSION_SECONDS = 8 * 3600;
+const SESSION_SECONDS = 30 * 24 * 3600;
+const SESSION_RENEW_INTERVAL = 24 * 3600;
 const FLOW_SECONDS = 10 * 60;
 const encoder = new TextEncoder();
 const validId = value => typeof value === 'string' && /^[1-9]\d{0,19}$/.test(value);
@@ -101,7 +102,18 @@ async function authenticate(request, env, config) {
     await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(session.token_hash).run();
     return null;
   }
-  return { user, csrf: session.csrf_token, sessionHash: session.token_hash };
+  let renewalCookie = '';
+  const time = nowSeconds();
+  if (['GET', 'HEAD'].includes(request.method) && session.expires_at < time + SESSION_SECONDS - SESSION_RENEW_INTERVAL) {
+    await env.DB.prepare('UPDATE sessions SET expires_at = ? WHERE token_hash = ? AND expires_at > ?').bind(time + SESSION_SECONDS, session.token_hash, time).run();
+    renewalCookie = setCookie(SESSION_COOKIE, raw, SESSION_SECONDS);
+  }
+  return { user, csrf: session.csrf_token, sessionHash: session.token_hash, renewalCookie };
+}
+
+function rememberSession(response, auth) {
+  if (auth?.renewalCookie) response.headers.append('Set-Cookie', auth.renewalCookie);
+  return response;
 }
 
 function requireAdmin(auth) {
@@ -268,7 +280,7 @@ export function createWorker({ fetchImpl = (...args) => fetch(...args) } = {}) {
         if (url.origin !== config.origin) throw new HttpError(421, 'WRONG_HOST', '请使用已配置的站点网址。');
         if (url.pathname === '/login' && ['GET', 'HEAD'].includes(request.method)) {
           const auth = await authenticate(request, env, config);
-          if (auth) return redirect(safeReturn(url.searchParams.get('returnTo')));
+          if (auth) return rememberSession(redirect(safeReturn(url.searchParams.get('returnTo'))), auth);
           return html(loginPage({ reason: url.searchParams.get('reason') || '', returnTo: safeReturn(url.searchParams.get('returnTo')), configured: config.oauthReady }, nonce), nonce);
         }
         if (url.pathname === '/auth/github' && request.method === 'GET') return await beginOAuth(request, env, config);
@@ -281,7 +293,7 @@ export function createWorker({ fetchImpl = (...args) => fetch(...args) } = {}) {
           }
           return redirect('/login?returnTo=' + encodeURIComponent(safeReturn(url.pathname)), [clearCookie(SESSION_COOKIE)]);
         }
-        if (url.pathname === '/api/auth/me' && request.method === 'GET') return json({ user: auth.user, csrfToken: auth.csrf });
+        if (url.pathname === '/api/auth/me' && request.method === 'GET') return rememberSession(json({ user: auth.user, csrfToken: auth.csrf }), auth);
         if (url.pathname === '/auth/logout' && request.method === 'POST') {
           checkMutation(request, config, auth);
           await env.DB.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(auth.sessionHash).run();
@@ -289,13 +301,13 @@ export function createWorker({ fetchImpl = (...args) => fetch(...args) } = {}) {
           response.headers.append('Set-Cookie', clearCookie(SESSION_COOKIE)); response.headers.append('Set-Cookie', clearCookie(FLOW_COOKIE));
           return response;
         }
-        if (url.pathname === '/admin' && ['GET', 'HEAD'].includes(request.method)) { requireAdmin(auth); return html(adminPage(auth.user, auth.csrf, nonce), nonce); }
-        if (url.pathname.startsWith('/api/admin/')) return await adminAPI(request, env, config, auth, url);
+        if (url.pathname === '/admin' && ['GET', 'HEAD'].includes(request.method)) { requireAdmin(auth); return rememberSession(html(adminPage(auth.user, auth.csrf, nonce), nonce), auth); }
+        if (url.pathname.startsWith('/api/admin/')) return rememberSession(await adminAPI(request, env, config, auth, url), auth);
         if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/auth/')) throw new HttpError(404, 'NOT_FOUND', '没有找到这个页面。');
         if (!['GET', 'HEAD'].includes(request.method)) throw new HttpError(405, 'METHOD_NOT_ALLOWED', '不支持这个请求方法。');
         const assetURL = new URL(request.url);
         if (assetURL.pathname === '/index.html' || assetURL.pathname === '/动态相册.html' || assetURL.pathname.toLowerCase() === '/%e5%8a%a8%e6%80%81%e7%9b%b8%e5%86%8c.html') assetURL.pathname = '/';
-        return protectedResponse(await env.ASSETS.fetch(new Request(assetURL, { method: request.method, headers: request.headers })), nonce, true);
+        return rememberSession(protectedResponse(await env.ASSETS.fetch(new Request(assetURL, { method: request.method, headers: request.headers })), nonce, true), auth);
       } catch (error) {
         const status = error instanceof HttpError ? error.status : 503;
         const message = error instanceof HttpError ? error.message : '站点服务暂不可用，请稍后重试或联系管理员检查部署配置。';

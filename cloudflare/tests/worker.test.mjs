@@ -235,6 +235,44 @@ test('only session hashes are stored; session and OAuth expiry are enforced; log
   const start = await f.begin(); f.sqlite.prepare('UPDATE oauth_states SET expires_at=0').run(); assert.equal((await f.finish(start, 'owner')).response.headers.get('Location'), '/login?reason=state');
 });
 
+test('remembered devices enter directly and renew a 30-day session without repeating OAuth', async t => {
+  let time = 1804200000;
+  t.mock.method(Date, 'now', () => time * 1000);
+  const f = fixture(t), owner = await f.login();
+  const lifetime = 30 * 24 * 3600;
+  assert.ok(owner.response.headers.getSetCookie().some(value => value.startsWith('__Host-moments_session=') && value.includes('Max-Age=' + lifetime)));
+  const networkCalls = f.calls.length;
+  const open = () => f.send('/', { headers: { Cookie: owner.sessionCookie } });
+  assert.equal((await open()).status, 200);
+  const direct = await f.send('/login', { headers: { Cookie: owner.sessionCookie } });
+  assert.equal(direct.headers.get('Location'), '/');
+  assert.equal(direct.headers.getSetCookie().length, 0, 'A fresh session does not write the database or cookie repeatedly');
+  time += 25 * 3600;
+  const renewed = await open();
+  assert.equal(renewed.status, 200);
+  assert.ok(renewed.headers.getSetCookie().some(value => value.includes('Max-Age=' + lifetime)));
+  assert.equal(f.sqlite.prepare('SELECT expires_at FROM sessions').get().expires_at, time + lifetime);
+  assert.equal(f.calls.length, networkCalls, 'Remembering the device requires no GitHub calls');
+  assert.ok(!JSON.stringify(f.sqlite.prepare('SELECT * FROM sessions').get()).includes(owner.sessionCookie.split('=')[1]));
+  time += lifetime + 1;
+  assert.equal((await open()).status, 303, 'Expired sessions cannot be silently revived');
+});
+
+test('existing short sessions upgrade on return, while revoked users are never renewed', async t => {
+  const f = fixture(t), owner = await f.login();
+  await f.add(owner);
+  const member = await f.login('member'), now = Math.floor(Date.now() / 1000);
+  f.sqlite.prepare('UPDATE sessions SET expires_at=?').run(now + 8 * 3600);
+  const upgraded = await f.send('/admin', { headers: { Cookie: owner.sessionCookie } });
+  assert.equal(upgraded.status, 200);
+  assert.ok(upgraded.headers.getSetCookie().some(value => value.includes('Max-Age=2592000')));
+  f.sqlite.prepare('UPDATE allowed_users SET active=0 WHERE github_id=?').run('301');
+  const revoked = await f.send('/', { headers: { Cookie: member.sessionCookie } });
+  assert.equal(revoked.status, 303);
+  assert.ok(revoked.headers.getSetCookie().every(value => value.includes('Max-Age=0')));
+  assert.equal(f.sqlite.prepare('SELECT COUNT(*) AS n FROM sessions WHERE github_id=?').get('301').n, 0);
+});
+
 test('missing owner configuration, a failed database, and unconfigured alternate hostnames fail closed', async t => {
   const f = fixture(t); const noOwner = { ...f.env, OWNER_GITHUB_ID: '' };
   assert.equal((await f.worker.fetch(new Request(ORIGIN + '/'), noOwner)).status, 503);
