@@ -1,4 +1,4 @@
-import { interfaceStyle, interfaceScript, loadingMarkup } from './interface.mjs';
+import { interfaceStyle, interfaceScript, loadingMarkup, spaceMark } from './interface.mjs';
 const escape = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const safeJSON = value => JSON.stringify(value).replace(/</g, '\\u003c');
 const style = `${interfaceStyle}
@@ -12,21 +12,39 @@ const style = `${interfaceStyle}
 @media(max-height:650px){.admin{grid-template-rows:48px minmax(0,1fr);padding:12px;gap:12px}.workspace-heading{display:none}.panel{padding:14px}.fields{margin-top:10px}.invite-panel .small{display:none}.status{margin-top:6px}}
 `;
 
+const accessStyle = `
+.access-shell{height:100dvh;min-height:0;display:grid;grid-template-columns:228px minmax(0,1fr) 260px;grid-template-rows:62px minmax(0,1fr);gap:20px;padding:24px;overflow:hidden}
+.access-brand{grid-column:1;grid-row:1}.access-toolbar{grid-column:2;grid-row:1;justify-content:space-between}.access-toolbar .toolbar-label{display:flex}.access-title{grid-column:3;grid-row:1}
+.access-center{grid-column:2;grid-row:2;display:flex;align-items:center;justify-content:center;min-width:0;min-height:0;overflow:auto;border-radius:16px;background-image:radial-gradient(var(--dots) .6px,transparent .6px);background-size:23px 23px;padding:24px 16px}
+.access-shell .login-card{width:min(480px,100%);padding:38px 34px;border-radius:16px;box-shadow:0 18px 50px #0002;position:relative;overflow:hidden}.access-shell .login-card:before{content:"";position:absolute;width:210px;height:210px;right:-115px;top:-105px;border:1px solid var(--accent-line);border-radius:50%;box-shadow:0 0 0 26px var(--selected);pointer-events:none}.access-shell h1{font-size:29px;line-height:1.5;letter-spacing:1px;margin:18px 0}.access-shell .mark{margin:24px 0 18px}.access-shell .mark svg{height:44px;width:44px;stroke-width:1}.access-shell .wide{min-height:44px;font-size:14px}.access-shell .small{margin-top:16px;font-size:11px}.access-side{grid-column:1;grid-row:2;padding:14px 12px;color:var(--muted);font-size:12px;line-height:2;display:flex;flex-direction:column;gap:20px}.access-side strong{font-weight:500;letter-spacing:2px;font-size:10px;color:var(--accent)}.access-side .access-line{width:36px;height:1px;background:var(--accent-line)}.access-note{grid-column:3;grid-row:2;align-self:end;border-top:1px solid var(--line);padding-top:16px;color:var(--muted);font-size:11px;line-height:1.9}
+:root[data-density=compact] .access-shell{padding:16px;gap:12px}
+@media(max-width:1200px){.access-shell{grid-template-columns:178px minmax(0,1fr) 210px;gap:14px;padding:16px}.access-shell .login-card{padding:32px 26px}.access-shell h1{font-size:26px}}
+@media(max-width:980px){.access-shell{grid-template-columns:160px minmax(0,1fr)}.access-title,.access-note{display:none}}
+@media(max-width:600px){.access-shell{padding:10px;gap:12px;grid-template-columns:44px minmax(0,1fr);grid-template-rows:48px minmax(0,1fr)}.access-side{padding:12px 0;align-items:center}.access-side>span,.access-side>p{display:none}.access-side strong{writing-mode:vertical-rl;letter-spacing:3px}.access-center{padding:12px 0}.access-shell .login-card{padding:28px 22px;border-radius:14px}.access-shell h1{font-size:23px;letter-spacing:0}.access-shell .mark svg{height:36px;width:36px}.access-toolbar .toolbar-label{font-size:10px}.access-toolbar{padding:7px 10px}.access-shell .wide{font-size:13px}}
+@media(max-height:560px){.access-center{align-items:flex-start;padding:10px}.access-shell .login-card{padding:20px}.access-shell .mark{display:none}.access-shell h1{font-size:23px;margin:12px 0}}
+`;
+
+const accessScript = `window.MomentsUI.apply();const theme=document.getElementById('admin-theme-toggle');theme?.addEventListener('click',()=>{const prefs=window.MomentsUI.read();prefs.appearanceTheme=document.documentElement.dataset.theme==='light'?'dark':'light';window.MomentsUI.remember(prefs);window.MomentsUI.apply(prefs);});window.MomentsUI.ready();`;
+
+function accessLayout(content) {
+  return `<main class="access-shell"><div class="admin-brand access-brand">${spaceMark}<div class="brand-copy"><strong class="brand-name">瞬间</strong><span class="brand-sub">MOMENTS</span></div></div><header class="admin-toolbar access-toolbar" aria-label="登录页操作栏"><span class="toolbar-label">我们的空间 / 邀请访问</span><div class="toolbar-actions"><button class="icon-button" id="admin-theme-toggle" type="button" aria-label="切换为日间模式"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 13.2A9 9 0 0 1 10.8 3.1 9 9 0 1 0 20.8 13.2Z"/></svg></button></div></header><div class="admin-title access-title"><span>OUR PRIVATE SPACE</span><strong data-album-name>未命名相册</strong></div><aside class="access-side" aria-hidden="true"><strong>ONLY FOR US</strong><span class="access-line"></span><p>留给彼此的日常，<br>和每一个值得记住的瞬间。</p></aside><section class="access-center"><section class="login-card">${content}</section></section><aside class="access-note">一些瞬间，<br>只与获邀的人分享。</aside></main>`;
+}
+
 function shell(title, body, nonce, script = '') {
-  return `<!doctype html><html lang="zh-CN" data-theme="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111513"><meta name="robots" content="noindex,nofollow"><title>${escape(title)} · 瞬间</title><style nonce="${nonce}">${style}</style><script nonce="${nonce}">${interfaceScript}</script><noscript><style nonce="${nonce}">.startup-screen{display:none}body.is-loading>.page-content{opacity:1;transform:none}</style></noscript></head><body class="is-loading">${loadingMarkup}<div class="page-content" data-startup-inert inert>${body}</div><script nonce="${nonce}">${script || 'window.MomentsUI.ready();'}</script></body></html>`;
+  return `<!doctype html><html lang="zh-CN" data-theme="dark"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111513"><meta name="robots" content="noindex,nofollow"><title>${escape(title)} · 瞬间</title><style nonce="${nonce}">${style}${accessStyle}</style><script nonce="${nonce}">${interfaceScript}</script><noscript><style nonce="${nonce}">.startup-screen{display:none}body.is-loading>.page-content{opacity:1;transform:none}</style></noscript></head><body class="is-loading">${loadingMarkup}<div class="page-content" data-startup-inert inert>${body}</div><script nonce="${nonce}">${script || 'window.MomentsUI.ready();'}</script></body></html>`;
 }
 
 export function loginPage({ reason = '', returnTo = '/', configured = true }, nonce) {
   const notices = { expired: '登录已过期或访问权限已变更，请重新登录。', state: '这次登录已失效，请重新点击 GitHub 登录。', provider: 'GitHub 登录暂未完成，请稍后重试。', provider_token: '暂时无法完成 GitHub 登录验证，请稍后重试。', provider_credentials: '站点的 GitHub 登录凭据不匹配，请联系管理员核对配置。', provider_redirect: '站点的 GitHub 登录回调地址不匹配，请联系管理员核对配置。', provider_email: '请先在 GitHub 验证账号的主要邮箱，再重新登录。', provider_profile: '暂时无法读取 GitHub 身份，请稍后重试。', provider_session: '暂时无法保存登录会话，请稍后重试。', denied: '当前账号尚未获得访问许可，请联系管理员。' };
-  return shell('登录', `<main class="login"><section class="login-card"><span class="eyebrow">MOMENTS · PRIVATE SPACE</span><div class="mark" aria-hidden="true">◎</div><h1>一些瞬间，<br>只与获邀的人分享。</h1><p>请使用获准的 GitHub 账号登录。</p>${configured ? `${notices[reason] ? `<p class="notice" role="status">${notices[reason]}</p>` : ''}<a class="button primary wide" href="/auth/github?returnTo=${encodeURIComponent(returnTo)}">使用 GitHub 登录</a><p class="small">登录后仍需通过账号白名单验证。</p>` : '<p class="notice" role="status">站点尚未完成登录配置，请联系管理员完成部署设置。</p>'}</section></main>`, nonce);
+  return shell('登录', accessLayout(`<span class="eyebrow">MOMENTS · PRIVATE SPACE</span><div class="mark" aria-hidden="true">${spaceMark}</div><h1>一些瞬间，<br>只与获邀的人分享。</h1><p>请使用获准的 GitHub 账号登录。</p>${configured ? `${Object.hasOwn(notices, reason) ? `<p class="notice" role="status">${notices[reason]}</p>` : ''}<a class="button primary wide" href="/auth/github?returnTo=${encodeURIComponent(returnTo)}">使用 GitHub 登录</a><p class="small">登录后仍需通过账号白名单验证。</p>` : '<p class="notice" role="status">站点尚未完成登录配置，请联系管理员完成部署设置。</p>'}`), nonce, accessScript);
 }
 
 export function deniedPage(login, nonce) {
-  return shell('暂未获准访问', `<main class="login"><section class="login-card"><span class="eyebrow">MOMENTS · PRIVATE SPACE</span><h1>这扇门，<br>还在等待邀请。</h1><p>${login ? `GitHub 账号 <strong>@${escape(login)}</strong> ` : '你的账号'}尚未加入访问白名单。</p><p>请把 GitHub 用户名告诉管理员，获准后再登录。</p><a class="button wide" href="/auth/github">更换账号或重试</a></section></main>`, nonce);
+  return shell('暂未获准访问', accessLayout(`<span class="eyebrow">MOMENTS · PRIVATE SPACE</span><div class="mark" aria-hidden="true">${spaceMark}</div><h1>这扇门，<br>还在等待邀请。</h1><p>${login ? `GitHub 账号 <strong>@${escape(login)}</strong> ` : '你的账号'}尚未加入访问白名单。</p><p>请把 GitHub 用户名告诉管理员，获准后再登录。</p><a class="button wide" href="/auth/github">更换账号或重试</a>`), nonce, accessScript);
 }
 
 export function messagePage(title, message, nonce) {
-  return shell(title, `<main class="login"><section class="login-card"><span class="eyebrow">MOMENTS</span><h1>${escape(title)}</h1><p>${escape(message)}</p><a class="button wide" href="/login">返回登录页</a></section></main>`, nonce);
+  return shell(title, accessLayout(`<span class="eyebrow">MOMENTS</span><div class="mark" aria-hidden="true">${spaceMark}</div><h1>${escape(title)}</h1><p>${escape(message)}</p><a class="button wide" href="/login">返回登录页</a>`), nonce, accessScript);
 }
 
 export function adminPage(user, csrf, nonce) {

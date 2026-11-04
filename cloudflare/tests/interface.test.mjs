@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { readFileSync } from 'node:fs';
 import { interfaceScript, interfaceStyle, loadingMarkup } from '../src/interface.mjs';
-import { adminPage, loginPage } from '../src/pages.mjs';
+import { adminPage, loginPage, deniedPage } from '../src/pages.mjs';
 
 function browser(storageValue = '{}', blocked = false, systemLight = false) {
   const listeners = {}, timers = new Map(), classes = new Set(['is-loading']);
@@ -35,6 +35,18 @@ test('album and administrator share theme, accent, density and the supplied spok
   for (const page of [admin, loginPage({}, 'test-nonce'), album]) {
     for (const [, attrs, script] of page.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) if (!attrs.includes('application/json')) new vm.Script(script);
   }
+});
+
+test('login and loading keep the album frame without revealing private album content', () => {
+  const login = loginPage({ reason: 'constructor' }, 'nonce-test');
+  assert.ok(login.includes('登录页操作栏'));
+  assert.ok(login.includes('access-shell'));
+  assert.ok(login.includes('data-album-name'));
+  assert.ok(login.includes('startup-toolbar'));
+  assert.ok(!login.includes('function Object'));
+  assert.ok(!login.includes('钟桢'));
+  const denied = deniedPage('<img src=x onerror=alert(1)>', 'nonce-test');
+  assert.ok(!denied.includes('<img src=x')); assert.ok(denied.includes('&lt;img'));
 });
 
 test('loading completion reveals content, releases controls and cannot leave an invisible blocker', () => {
